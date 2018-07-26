@@ -164,7 +164,7 @@ while True:
     try:
         times.append(times[-1] + dt)
     except IndexError:
-        time.append(dt)
+        times.append(dt)
     read_sample_temperature()
     for channel in range (0,channelamount):
         if flag[channel] == 0:
