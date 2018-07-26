@@ -1,4 +1,5 @@
-#Version 1.0 last updated on 19-Jul-2018
+#Version 1.1 last updated on 26-Jul-2018
+#https://github.com/RickyZiegahn/Oven-Temperature-Controller 
 
 import serial
 import time
@@ -26,6 +27,7 @@ set_temperature = []
 band = []
 integral_time = []
 measured_temperature = []
+sample_temperature = []
 proportional_term = []
 integral_term = []
 output = []
@@ -33,6 +35,7 @@ app = []
 p = []
 curve = []
 datafile = []
+flag = []
 
 '''
 fill the lists with default values and have the amount of items equal to the amount
@@ -47,10 +50,11 @@ for channel in range (0,channelamount):
     proportional_term.append(0)
     integral_term.append(0)
     output.append(0)
+    flag.append(0)
     
     app.append(QtGui.QApplication([]))
     p.append(pg.plot())
-    p[channel].setLabel('top', 'Channel ' + str(channel) + ' temperature vs time')
+    p[channel].setLabel('top', 'Channel ' + str(channel))
     p[channel].setLabel('bottom', 'Time (s)')
     p[channel].setLabel('left', 'Temperature (Degrees Celsius)')
     p[channel].enableAutoRange(x=True,y=False)
@@ -60,6 +64,20 @@ for channel in range (0,channelamount):
         datafile.append(time.strftime('%Y%m%d %H%M%S') + ' channel ' + str(channel) + ' log.txt')
         with open(datafile[channel], 'w') as fdata:
             fdata.write('TIME TEMPERATURE PROPORTIONAL INTEGRAL OUTPUT')
+
+sample_app = QtGui.QApplication([])
+sample_p = pg.plot()
+sample_p.setLabel('top', 'Sample Channel')
+sample_p.setLabel('bottom', 'Time (s)')
+sample_p.setLabel('left', 'Temperature (Degrees Celsius)')
+sample_p.enableAutoRange()
+sample_curve = sample_p.plot()
+sample_flag = 0
+
+if logging == 'on':
+    samplefile = time.strftime('%Y%m%d %H%M%S') + ' Sample log.txt'
+    with open(samplefile, 'w') as fdata:
+        fdata.write('TIME TEMPERATURE')
 
 with open(inputfile, 'w') as ftemp:
     '''
@@ -103,9 +121,24 @@ def read_measured_temp(channel):
     '''
     Read the temperature and add it to a list of temperatures for graphing.
     '''
-    rstr = ser.readline()
+    rstr = ser.readline().strip()
     rfloat = float(rstr)
     measured_temperature[channel].append(rfloat)
+    if rstr == 'nan':
+        flag[channel] = 1
+        print 'Thermocouple on Channel ' + str(channel) + ' is not functioning.'
+    else:
+        flag[channel] = 0
+
+def read_sample_temperature():
+    rstr = ser.readline()
+    rfloat = float(rstr)
+    sample_temperature.append(rfloat)
+    if rstr == 'nan':
+        sample_flag = 1
+        print 'Thermocouple on Sample is not functioning.'
+    else:
+        sample_flag = 0
 
 def read_state(channel):
     '''
@@ -113,10 +146,14 @@ def read_state(channel):
     '''
     output[channel] = ser.readline().strip()
     proportional_term[channel] = ser.readline().strip()
-    integral_term[channel] = ser.readline.strip()
+    integral_term[channel] = ser.readline().strip()
+    if flag[channel] == 1:
+        output[channel] = 'nan'
+        proportional_term[channel] = 'nan'
+        integral_term[channel] = 'nan'
     
 times = []
-time.sleep(delaytime)
+time.sleep(1.5)
 
 while True:
     for channel in range (0,channelamount):
@@ -124,33 +161,47 @@ while True:
         give_target_settings(channel)
         read_measured_temp(channel)
         read_state(channel)
-        
-    times.append(len(measured_temperature[0]) * dt) #append the current time by looking at the times data was received. 0 is picked because there will always be at least 1 channel.
-    
+    times.append((len(times) * dt) + dt)
+    read_sample_temperature()
     for channel in range (0,channelamount):
-        curve[channel].setData(x = times[-maxdata:], y = measured_temperature[channel][-maxdata:]) #only shows the last 60 seconds of measurements
-        #if the last quarter of the data was within the band, change
-        #the range so that it only shows the values within the band
-        if (
-            (max(measured_temperature[channel][-int(maxdata/4):]) <= set_temperature[channel] + band[channel]/2)
-            and (min(measured_temperature[channel][-int(maxdata/4):]) >= set_temperature[channel] - band[channel]/2)
-            ):
-            p[channel].disableAutoRange()
-            p[channel].enableAutoRange(x=True,y=False)
-            p[channel].setYRange((set_temperature[channel] - band[channel]/2), (set_temperature[channel] + band[channel]/2))
-        #if it moves out of the band, move it back to automatically scaling
-        else:
-            p[channel].enableAutoRange()
-            
-        app[channel].processEvents() #update the graph
+        if flag[channel] == 0:
+            curve[channel].setData(x = times[-maxdata:], y = measured_temperature[channel][-maxdata:]) #only shows the last 60 seconds of measurements
+            #if the last quarter of the data was within the band, change
+            #the range so that it only shows the values within the band
+            if (
+                (max(measured_temperature[channel][-int(maxdata/4):]) <= set_temperature[channel] + band[channel]/2)
+                and (min(measured_temperature[channel][-int(maxdata/4):]) >= set_temperature[channel] - band[channel]/2)
+                ):
+                p[channel].disableAutoRange()
+                p[channel].enableAutoRange(x=True,y=False)
+                p[channel].setYRange((set_temperature[channel] - band[channel]/2), (set_temperature[channel] + band[channel]/2))
+            #if it moves out of the band, move it back to automatically scaling
+            else:
+                p[channel].enableAutoRange()
+            app[channel].processEvents() #update the graph
+    
+    if sample_flag == 0:
+        sample_curve.setData(x=times[-maxdata:], y = sample_temperature[-maxdata:])
+        sample_app.processEvents() #update the graph
+
+    if len(times) > 300: #keep memory usage down
+        times.pop(0)
+        for channel in range (0,channelamount):
+            measured_temperature[channel].pop(0)
+        sample_temperature.pop(0)
+
     if logging == 'on':
         for channel in range (0,channelamount):
             with open(datafile[channel], 'a') as fdata:
                 fdata.write('\n' + str(times[-1]) + ' ' + str(measured_temperature[channel][-1]) + ' ' + str(proportional_term[channel]) + ' ' + str(integral_term[channel]) + ' ' + str(output[channel]))
+        with open(samplefile, 'a') as fdata:
+            fdata.write('n' + times[-1] + ' ' + sample_temperature[-1])
     
     print '\n\nCurrent date and time: ' + time.strftime('%Y-%m-%d at %H:%M:%S') + '\n'
+    print 'Sample Temperature: ' + str(sample_temperature[-1]) + '\n' + str(sample_flag) + '\n'
     for channel in range (0,channelamount): 
         print 'Channel ' + str(channel)
+        print str(flag[channel])
         print 'Target Temperature: ' + str(set_temperature[channel])
         print 'Temperature: ' + str(measured_temperature[channel][-1])
         print 'Output: ' + str(output[channel])

@@ -1,3 +1,6 @@
+//https://github.com/RickyZiegahn/Oven-Temperature-Controller 
+//version 1.1
+
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
 #define channelamount 1
@@ -6,10 +9,13 @@ int DO = 4; //data out pin
 int CLK = 2; //clock pin
 int relay[channelamount] = {5}; //array of relay pin list
 int CS[channelamount] = {3}; //array of chip select pins
+int sample_pin = 6;
+int flag[channelamount] = {0}; //flag for the oven to be enabled or disabled, include a 0 for each channel
 
 int channels[channelamount];
 double set_temperature[channelamount];
 double measured_temperature[channelamount];
+double sample_temperature = 0;
 double error[channelamount];
 double band[channelamount];
 double proportional_term[channelamount];
@@ -22,6 +28,7 @@ int time_2;
 int dt = 1000; //time in milliseconds
 
 //initialize the thermocouples
+Adafruit_MAX31855 thermocouple_sample(CLK, sample_pin, DO);
 Adafruit_MAX31855 thermocouple_0(CLK, CS[0], DO);
 void read_temperature(int channel) {
   /*
@@ -29,6 +36,16 @@ void read_temperature(int channel) {
    */
   if (channel == 0) {
     measured_temperature[channel] = thermocouple_0.readCelsius(); //no way to store the thermocouple objects in an array
+  }
+  if (isnan(measured_temperature[channel])) {
+    flag[channel] = 1;
+    output[channel] = 0;
+    proportional_term[channel] = 0;
+    integral_term[channel] = 0;
+    digitalWrite(relay[channel],LOW);
+  }
+  else {
+    flag[channel] = 0;
   }
   Serial.println(measured_temperature[channel]);
 }
@@ -154,19 +171,28 @@ void loop() {
   while(!Serial.available()) {
     for (int channel = 0; channel < channelamount; channel++) {
       read_temperature(channel);
-      calculate_error(channel);
-      calculate_proportional_term(channel);
-      calculate_integral_term(channel);
-      calculate_output(channel);
-      calculate_up_time(channel);
+      if (flag[channel] == 0) {
+        calculate_error(channel);
+        calculate_proportional_term(channel);
+        calculate_integral_term(channel);
+        calculate_output(channel);
+        calculate_up_time(channel);
+      }
       give_weights(channel);
     }
+    sample_temperature = thermocouple_sample.readCelsius();
+    Serial.println(sample_temperature);
     //set time_1 and time_2 to the same value so dt = 0
     time_1 = millis();
     time_2 = millis();
     while(time_2 - time_1 < dt) {
       for (int channel = 0; channel < channelamount; channel++) {
-        check_time(channel);
+        if (flag[channel] == 0) {
+          check_time(channel);
+        }
+        if (flag[channel] == 1) {
+          digitalWrite(relay[channel], LOW);
+        }
       }
       time_2 = millis();
     }
