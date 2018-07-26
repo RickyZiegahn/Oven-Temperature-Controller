@@ -161,7 +161,10 @@ while True:
         give_target_settings(channel)
         read_measured_temp(channel)
         read_state(channel)
-    times.append((len(times) * dt) + dt)
+    try:
+        times.append(times[-1] + dt)
+    except IndexError:
+        time.append(dt)
     read_sample_temperature()
     for channel in range (0,channelamount):
         if flag[channel] == 0:
