@@ -201,10 +201,9 @@ while True:
             fdata.write('n' + times[-1] + ' ' + sample_temperature[-1])
     
     print '\n\nCurrent date and time: ' + time.strftime('%Y-%m-%d at %H:%M:%S') + '\n'
-    print 'Sample Temperature: ' + str(sample_temperature[-1]) + '\n' + str(sample_flag) + '\n'
+    print 'Sample Temperature: ' + str(sample_temperature[-1]) + '\n'
     for channel in range (0,channelamount): 
         print 'Channel ' + str(channel)
-        print str(flag[channel])
         print 'Target Temperature: ' + str(set_temperature[channel])
         print 'Temperature: ' + str(measured_temperature[channel][-1])
         print 'Output: ' + str(output[channel])
