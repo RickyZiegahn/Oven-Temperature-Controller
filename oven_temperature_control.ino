@@ -1,5 +1,5 @@
 //https://github.com/RickyZiegahn/Oven-Temperature-Controller 
-//version 1.1
+//Version 1.2
 
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
@@ -42,10 +42,8 @@ void read_temperature(int channel) {
     output[channel] = 0;
     proportional_term[channel] = 0;
     integral_term[channel] = 0;
+    up_time[channel] = 0;
     digitalWrite(relay[channel],LOW);
-  }
-  else {
-    flag[channel] = 0;
   }
   Serial.println(measured_temperature[channel]);
 }
