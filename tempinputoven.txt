@@ -1,0 +1,2 @@
+Target Temperature for Channel 0, in Degrees Celsius (do not include units):
+100
