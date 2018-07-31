@@ -80,9 +80,6 @@ void calculate_error(int channel) {
   /*
    * Calculates the error for a given channel.
    */
-  for (int i = 0; i < (measurementamount - 1); i++) {
-    error[channel] = error[channel];
-  }
   error[channel] = set_temperature[channel] - measured_temperature[channel];
 }
 
