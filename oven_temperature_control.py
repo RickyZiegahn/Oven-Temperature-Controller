@@ -12,10 +12,10 @@ import os
 import sys
 
 pname = 'COM3'
-band = [] #add bands to the list for each channel
-integral_time = [] #add integral times to the list for each channel
-logging = 'on' #set logging to 'on' or 'off' to enable real time plots and textfile logging
 channelamount = 2 #amount of channels to recieve data from
+band = [] #bands for channel 0 and channel 1
+integral_time = [] #integral times for channel 0 and channel 1
+logging = 'on' #set logging to 'on' or 'off' to enable real time plots and textfile logging
 
 dt = 1 #time interval between measurements (must be equal to that on the arduino)
 inputfile = 'tempinputoven.txt' #name of the input file
@@ -56,8 +56,6 @@ of channels
 for channel in range (0,channelamount):
     input_temperature.append(-1) #default to -1 so it will always be updated to zero immediately when the program begins
     set_temperature.append(-1)
-    band.append(5)
-    integral_time.append(10)
     measured_temperature.append([]) #creates a 2 dimensional list, each sub list will contain all the measured temperature for a channel
     proportional_term.append(0)
     integral_term.append(0)
