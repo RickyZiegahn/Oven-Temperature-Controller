@@ -13,8 +13,8 @@ import sys
 
 pname = 'COM3'
 channelamount = 2 #amount of channels to recieve data from
-band = [] #bands for channel 0 and channel 1
-integral_time = [] #integral times for channel 0 and channel 1
+band = [5,5] #bands for channel 0 and channel 1
+integral_time = [10,10] #integral times for channel 0 and channel 1
 logging = 'on' #set logging to 'on' or 'off' to enable real time plots and textfile logging
 
 dt = 1 #time interval between measurements (must be equal to that on the arduino)
