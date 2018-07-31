@@ -115,10 +115,10 @@ def read_target_temp(channel):
     with open(inputfile, 'r') as ftemp:
         inputlines = ftemp.readlines()
         try:
-            float(inputlines[(channel + 1)]) #checks that the input is a number
+            float(inputlines[(2*channel + 1)]) #checks that the input is a number
             input_temperature[channel] = round(float(inputlines[(2*channel + 1)].strip()))
         except ValueError:
-            print 'Error: Temperature ' + str(channel) + ' input is not in the correct format.'
+            print 'Error: Temperature for Channel ' + str(channel) + ' input is not in the correct format.'
         
 def give_target_settings(channel):
     '''
