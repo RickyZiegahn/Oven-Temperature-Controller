@@ -1,16 +1,17 @@
-//https://github.com/RickyZiegahn/Oven-Temperature-Controller 
-//Version 1.2
+/*
+ * Version 1.4 last updated 31-July-2018
+ * https://github.com/RickyZiegahn/X-Ray_Diffraction
+ * Made for McGill University under D.H. Ryan
+ */
 
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
-#define channelamount 1
-int measurementamount = 5;
-int DO = 4; //data out pin
+#define channelamount 2
 int CLK = 2; //clock pin
-int relay[channelamount] = {5}; //array of relay pin list
-int CS[channelamount] = {3}; //array of chip select pins
-int sample_pin = 6;
-int flag[channelamount] = {0}; //flag for the oven to be enabled or disabled, include a 0 for each channel
+int DO = 3; //data out pin
+int sample_pin = 4;
+int CS[channelamount] = {5,6}; //array of chip select pins
+int relay[channelamount] = {7,8}; //array of relay pin list
 
 int channels[channelamount];
 double set_temperature[channelamount];
@@ -22,20 +23,25 @@ double proportional_term[channelamount];
 double integral_term[channelamount];
 double integral_time[channelamount]; //integral times in milliseconds
 double output[channelamount];
-int up_time[channelamount];
+int up_time[channelamount]; //time (ms) that the oven is on for
 int time_1;
 int time_2;
 int dt = 1000; //time in milliseconds
+int flag[channelamount]; //flag for the oven to be enabled or disabled, include a 0 for each channel
 
 //initialize the thermocouples
 Adafruit_MAX31855 thermocouple_sample(CLK, sample_pin, DO);
 Adafruit_MAX31855 thermocouple_0(CLK, CS[0], DO);
+Adafruit_MAX31855 thermocouple_1(CLK, CS[1], DO);
 void read_temperature(int channel) {
   /*
    * Reads the temperature of a given channel.
    */
   if (channel == 0) {
     measured_temperature[channel] = thermocouple_0.readCelsius(); //no way to store the thermocouple objects in an array
+  }
+  if (channel == 1) {
+    measured_temperature[channel] = thermocouple_1.readCelsius();
   }
   if (isnan(measured_temperature[channel])) {
     flag[channel] = 1;
@@ -62,11 +68,12 @@ void accept_parameters(int channel) {
    * Accepts the set temperature, band, and integral time for a given channel.
    */
   wait_for_input();
-  set_temperature[channel] = Serial.parseFloat();
-  wait_for_input();
-  band[channel] = Serial.parseFloat();
-  wait_for_input();
-  integral_time[channel] = Serial.parseFloat();
+  set_temperature[channel] = Serial.parseInt() / 4;
+  Serial.read();
+  band[channel] = Serial.parseInt() / 4;
+  Serial.read();
+  integral_time[channel] = Serial.parseInt() / 4;
+  Serial.read();
 }
 
 void calculate_error(int channel) {
@@ -153,6 +160,7 @@ void check_time(int channel) {
 
 void setup() {
   Serial.begin(9600);
+  Serial.setTimeout(50);
   pinMode(relay[0], OUTPUT);
 }
 

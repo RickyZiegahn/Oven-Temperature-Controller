@@ -1,15 +1,22 @@
-#Version 1.2 last updated on 26-Jul-2018
-#https://github.com/RickyZiegahn/Oven-Temperature-Controller 
+'''
+Version 1.4 last updated on 31-Jul-2018
+https://github.com/RickyZiegahn/Oven-Temperature-Controller 
+Made for McGill University under D.H. Ryan
+'''
 
 import serial
 import time
 from pyqtgraph.Qt import QtGui
 import pyqtgraph as pg
+import os
+import sys
 
 pname = 'COM3'
-channelamount = 1 #amount of channels to recieve data from
-logging = 'off' #set logging to 'on' or 'off' to enable real time plots and textfile logging
-delaytime = 2 #time needed so arduino catches all commands
+band = [] #add bands to the list for each channel
+integral_time = [] #add integral times to the list for each channel
+logging = 'on' #set logging to 'on' or 'off' to enable real time plots and textfile logging
+channelamount = 2 #amount of channels to recieve data from
+
 dt = 1 #time interval between measurements (must be equal to that on the arduino)
 inputfile = 'tempinputoven.txt' #name of the input file
 maxdata = 300 #length of time axis during plotting
@@ -22,20 +29,26 @@ be done in the python code to be ready for more heaters
 '''
 input_temperature = []
 set_temperature = []
-band = []
-integral_time = []
 measured_temperature = []
 sample_temperature = []
 proportional_term = []
 integral_term = []
 output = []
+flag = []
+sample_flag = 0
 if logging == 'on':
+    logpath = 'heater logs/'
     app = []
     p = []
     curve = []
     datafile = []
     flag = []
-
+    if not os.path.exists(os.path.dirname(logpath)): #create the path if it doesn't exist
+        try:
+            os.makedirs(os.path.dirname(logpath))
+        except OSError:
+            if not os.path.isdir(logpath):
+                raise
 '''
 fill the lists with default values and have the amount of items equal to the amount
 of channels
@@ -60,9 +73,12 @@ for channel in range (0,channelamount):
         p[channel].enableAutoRange(x=True,y=False)
         curve.append(p[channel].plot())
         
-        datafile.append(time.strftime('%Y%m%d %H%M%S') + ' CHANNEL ' + str(channel) + ' log.txt')
-        with open(datafile[channel], 'w') as fdata:
-            fdata.write('TIME TEMPERATURE PROPORTIONAL INTEGRAL OUTPUT')
+        datafile.append(logpath + time.strftime('%Y%m%d %H%M%S') + ' CHANNEL ' + str(channel) + ' log.txt') #replace \\ with / on Linux or MacOS
+        try:
+            with open(datafile[channel], 'w') as fdata:
+                fdata.write('TIME TEMPERATURE PROPORTIONAL INTEGRAL OUTPUT')
+        except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+            print 'Creation of Channel ' + str(channel) + ' log file failed'
 
 if logging == 'on':
     sample_app = QtGui.QApplication([])
@@ -74,9 +90,12 @@ if logging == 'on':
     sample_curve = sample_p.plot()
     sample_flag = 0
     
-    samplefile = time.strftime('%Y%m%d %H%M%S') + ' SAMPLE log.txt'
-    with open(samplefile, 'w') as fdata:
-        fdata.write('TIME TEMPERATURE')
+    samplefile = logpath + time.strftime('%Y%m%d %H%M%S') + ' SAMPLE log.txt' #replace \\ with / on Linux or MacOS
+    try:
+        with open(samplefile, 'w') as fdata:
+            fdata.write('TIME TEMPERATURE')
+    except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+        print 'Creation of sample log file failed'
 
 with open(inputfile, 'w') as ftemp:
     '''
@@ -97,23 +116,22 @@ def read_target_temp(channel):
         inputlines = ftemp.readlines()
         try:
             float(inputlines[(channel + 1)]) #checks that the input is a number
-            input_temperature[channel] = float(inputlines[(2*channel + 1)].strip())
+            input_temperature[channel] = round(float(inputlines[(2*channel + 1)].strip()))
         except ValueError:
             print 'Error: Temperature ' + str(channel) + ' input is not in the correct format.'
         
 def give_target_settings(channel):
     '''
     Checks if the temperature inputted is different from the last temperature
-    given to the controller. Sends the new temperature if it is different.
+    given to the controller. Sends the new temperature if it is different. All
+    values are multiplied for because the thermocouple reader is accurate up
+    to a quarter of a degree. It is divided by 4 once its reaches the Arduino
     '''
     if input_temperature[:] != set_temperature[:]:
-        for channel in range (0,channelamount):
-            ser.write(str(input_temperature[channel]))
-            time.sleep(delaytime)
-            ser.write(str(band[channel]))
-            time.sleep(delaytime)
-            ser.write(str(integral_time[channel] * (dt * 1000))) #arduino takes time in milliseconds
-            time.sleep(delaytime)
+        writestring = '' #empty string for new commands
+        for channel in range (0,channelamount): #create a single string with all parameters.
+            writestring += str(int(input_temperature[channel] * 4)) + ',' + str(int(round(band[channel]*4))) + ',' + str(int(round(integral_time[channel]*1000*4))) + ','
+        ser.write(writestring)
         set_temperature[:] = input_temperature[:]
         
 def read_measured_temp(channel):
@@ -121,21 +139,20 @@ def read_measured_temp(channel):
     Read the temperature and add it to a list of temperatures for graphing.
     '''
     rstr = ser.readline().strip()
-    rfloat = float(rstr)
+    try:
+        rfloat = float(rstr)
+    except ValueError:
+        print 'Failed to connect to Arduino. Please restart the program.'
+        time.sleep(1000)
+        sys.exit()
     if channel == 'sample':
         sample_temperature.append(rfloat)
         if rstr == 'nan':
             sample_flag = 1
-            sample_app.close()
-            print 'Thermocouple on Sample is not functioning.'
     else: #if it isn't sample, it'll be a numbered channel
         measured_temperature[channel].append(rfloat)
         if rstr == 'nan':
             flag[channel] = 1
-            app[channel].close()
-            print 'Thermocouple on Channel ' + str(channel) + ' is not functioning.'
-
-        print 'Thermocouple on Sample is not functioning.'
 
 def read_state(channel):
     '''
@@ -150,7 +167,7 @@ def read_state(channel):
         integral_term[channel] = 'nan'
     
 times = []
-time.sleep(1.5)
+time.sleep(2) #time for Arduino to start up and connect
 
 while True:
     for channel in range (0,channelamount):
@@ -181,14 +198,20 @@ while True:
                 else:
                     p[channel].enableAutoRange()
                 app[channel].processEvents() #update the graph
-                with open(datafile[channel], 'a') as fdata: #log to text file
-                    fdata.write('\n' + str(times[-1]) + ' ' + str(measured_temperature[channel][-1]) + ' ' + str(proportional_term[channel]) + ' ' + str(integral_term[channel]) + ' ' + str(output[channel]))
+                try:
+                    with open(datafile[channel], 'a') as fdata: #log to text file
+                        fdata.write('\n' + str(times[-1]) + ' ' + str(measured_temperature[channel][-1]) + ' ' + str(proportional_term[channel]) + ' ' + str(integral_term[channel]) + ' ' + str(output[channel]))
+                except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+                    print 'Logging for Channel ' + str(channel) + ' at time ' + str(times[-1]) + ' has failed.'
         
         if sample_flag == 0:
             sample_curve.setData(x=times[-maxdata:], y = sample_temperature[-maxdata:]) #update the data
             sample_app.processEvents() #update the graph
-            with open(samplefile, 'a') as fdata: #log to text file
-                fdata.write('n' + times[-1] + ' ' + sample_temperature[-1])
+            try:
+                with open(samplefile, 'a') as fdata: #log to text file
+                    fdata.write('n' + str(times[-1]) + ' ' + str(sample_temperature[-1]))
+            except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+                print 'Logging for Sample Channel at time ' + str(times[-1]) + ' has failed.'
     
     if len(times) > maxdata: #keep memory usage down
         times.pop(0)
