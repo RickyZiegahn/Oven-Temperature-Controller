@@ -1,5 +1,5 @@
 '''
-Version 1.4 last updated on 31-Jul-2018
+Version 1.5 last updated on 02-Augl-2018
 https://github.com/RickyZiegahn/Oven-Temperature-Controller 
 Made for McGill University under D.H. Ryan
 '''
@@ -16,6 +16,7 @@ channelamount = 2 #amount of channels to recieve data from
 band = [5,5] #bands for channel 0 and channel 1
 integral_time = [10,10] #integral times for channel 0 and channel 1
 logging = 'on' #set logging to 'on' or 'off' to enable real time plots and textfile logging
+sample_option = 'on' #set to 'on' or 'off' to disable sample sensor (must be changed on the Arduino as well)
 
 dt = 1 #time interval between measurements (must be equal to that on the arduino)
 inputfile = 'tempinputoven.txt' #name of the input file
@@ -78,22 +79,23 @@ for channel in range (0,channelamount):
         except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
             print 'Creation of Channel ' + str(channel) + ' log file failed'
 
-if logging == 'on':
-    sample_app = QtGui.QApplication([])
-    sample_p = pg.plot()
-    sample_p.setLabel('top', 'Sample Channel')
-    sample_p.setLabel('bottom', 'Time (s)')
-    sample_p.setLabel('left', 'Temperature (Degrees Celsius)')
-    sample_p.enableAutoRange()
-    sample_curve = sample_p.plot()
-    sample_flag = 0
-    
-    samplefile = logpath + time.strftime('%Y%m%d %H%M%S') + ' SAMPLE log.txt' #replace \\ with / on Linux or MacOS
-    try:
-        with open(samplefile, 'w') as fdata:
-            fdata.write('TIME TEMPERATURE')
-    except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
-        print 'Creation of sample log file failed'
+if sample_option == 'on':
+    if logging == 'on':
+        sample_app = QtGui.QApplication([])
+        sample_p = pg.plot()
+        sample_p.setLabel('top', 'Sample Channel')
+        sample_p.setLabel('bottom', 'Time (s)')
+        sample_p.setLabel('left', 'Temperature (Degrees Celsius)')
+        sample_p.enableAutoRange()
+        sample_curve = sample_p.plot()
+        sample_flag = 0
+        
+        samplefile = logpath + time.strftime('%Y%m%d %H%M%S') + ' SAMPLE log.txt' #replace \\ with / on Linux or MacOS
+        try:
+            with open(samplefile, 'w') as fdata:
+                fdata.write('TIME TEMPERATURE')
+        except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+            print 'Creation of sample log file failed'
 
 with open(inputfile, 'w') as ftemp:
     '''
@@ -177,7 +179,8 @@ while True:
         times.append(times[-1] + dt)
     except IndexError: #if the list is empty, it will append the first value
         times.append(dt)
-    read_measured_temp('sample')
+    if sample_option == 'on':
+        read_measured_temp('sample')
     
     if logging == 'on': #only plot and log if logging is on
         for channel in range (0,channelamount):    
@@ -201,28 +204,30 @@ while True:
                         fdata.write('\n' + str(times[-1]) + ' ' + str(measured_temperature[channel][-1]) + ' ' + str(proportional_term[channel]) + ' ' + str(integral_term[channel]) + ' ' + str(output[channel]))
                 except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
                     print 'Logging for Channel ' + str(channel) + ' at time ' + str(times[-1]) + ' has failed.'
-        
-        if sample_flag == 0:
-            sample_curve.setData(x=times[-maxdata:], y = sample_temperature[-maxdata:]) #update the data
-            sample_app.processEvents() #update the graph
-            try:
-                with open(samplefile, 'a') as fdata: #log to text file
-                    fdata.write('n' + str(times[-1]) + ' ' + str(sample_temperature[-1]))
-            except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
-                print 'Logging for Sample Channel at time ' + str(times[-1]) + ' has failed.'
+        if sample_option == 'on':
+            if sample_flag == 0:
+                sample_curve.setData(x=times[-maxdata:], y = sample_temperature[-maxdata:]) #update the data
+                sample_app.processEvents() #update the graph
+                try:
+                    with open(samplefile, 'a') as fdata: #log to text file
+                        fdata.write('n' + str(times[-1]) + ' ' + str(sample_temperature[-1]))
+                except IOError: #if there is error saving (caused by Cloud Services), the program will not crash
+                    print 'Logging for Sample Channel at time ' + str(times[-1]) + ' has failed.'
     
     if len(times) > maxdata: #keep memory usage down
         times.pop(0)
         for channel in range (0,channelamount):
             measured_temperature[channel].pop(0)
-        sample_temperature.pop(0)
+        if sample_option == 'on':
+            sample_temperature.pop(0)
     
     print '\n\n\nCurrent date and time: ' + time.strftime('%Y-%m-%d at %H:%M:%S')
-    print '\nSample Channel'
-    if sample_flag == 0:
-        print 'Temperature: '+ str(sample_temperature[-1])
-    if sample_flag == 1:
-        print 'Thermocouple is not functioning'
+    if sample_option == 'on':
+        print '\nSample Channel'
+        if sample_flag == 0:
+            print 'Temperature: '+ str(sample_temperature[-1])
+        if sample_flag == 1:
+            print 'Thermocouple is not functioning'
     for channel in range (0,channelamount): 
         print '\nChannel ' + str(channel)
         if flag[channel] == 0:

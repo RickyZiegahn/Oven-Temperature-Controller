@@ -1,5 +1,5 @@
 /*
- * Version 1.4 last updated 31-July-2018
+ * Version 1.5 last updated 02-Aug-2018
  * https://github.com/RickyZiegahn/X-Ray_Diffraction
  * Made for McGill University under D.H. Ryan
  */
@@ -7,6 +7,7 @@
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
 #define channelamount 2
+int sample_option = 1; //set to 1 for on, 0 for off
 int CLK = 2; //clock pin
 int DO = 3; //data out pin
 int sample_pin = 4;
@@ -183,8 +184,10 @@ void loop() {
       }
       give_weights(channel);
     }
-    sample_temperature = thermocouple_sample.readCelsius();
-    Serial.println(sample_temperature);
+    if (sample_option == 1) {
+      sample_temperature = thermocouple_sample.readCelsius();
+      Serial.println(sample_temperature);
+    }
     //set time_1 and time_2 to the same value so dt = 0
     time_1 = millis();
     time_2 = millis();
