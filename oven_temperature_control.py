@@ -1,5 +1,5 @@
 '''
-Version 1.5 last updated on 02-Augl-2018
+Version 1.5 last updated on 02-Aug-2018
 https://github.com/RickyZiegahn/Oven-Temperature-Controller 
 Made for McGill University under D.H. Ryan
 '''
